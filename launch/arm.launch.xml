@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- Arguments -->
+    <arg name="config_file" 
+         default="$(find-pkg-share arms)/config/right_arm_params.yaml"
+         description="Path to the YAML configuration file for arm parameters"/>
+    
+    <arg name="use_sim_time" 
+         default="false"
+         description="Use simulation time"/>
+
+    <!-- Arm Node -->
+    <node pkg="arms" 
+          exec="arm_node" 
+          name="right_arm_node" 
+          output="screen">
+        
+        <!-- Load parameters from YAML file -->
+        <param from="$(var config_file)"/>
+        
+        <!-- Use simulation time parameter -->
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
+    <!-- Optional: Robot State Publisher (uncomment if you have a URDF) -->
+    <!-- 
+    <node pkg="robot_state_publisher" 
+          exec="robot_state_publisher" 
+          name="robot_state_publisher"
+          output="screen">
+        <param name="robot_description" 
+               value="$(command 'xacro $(find-pkg-share your_package_name)/urdf/robot.urdf.xacro')"/>
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+    -->
+
+</launch>
