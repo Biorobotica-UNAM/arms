@@ -9,6 +9,8 @@
          default="false"
          description="Use simulation time"/>
 
+    <include file="$(find-pkg-share manipulation_planner)/launch/demo.launch.py"/>
+
     <!-- Arm Node -->
     <node pkg="arms" 
           exec="arm_node" 
