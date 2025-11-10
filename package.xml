@@ -9,11 +9,6 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- For generating custom interfaces -->
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
-
   <!-- Core ROS2 dependencies -->
   <depend>rclcpp</depend>
   
@@ -21,11 +16,7 @@
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>moveit_msgs</depend>
-  
-  <!-- MoveIt dependencies -->
-  <depend>moveit_ros_planning_interface</depend>
-  <depend>moveit_core</depend>
-  
+
   <!-- TF2 dependencies -->
   <depend>tf2</depend>
   <depend>tf2_geometry_msgs</depend>
