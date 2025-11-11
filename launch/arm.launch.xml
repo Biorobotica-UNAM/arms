@@ -10,6 +10,7 @@
          description="Use simulation time"/>
 
     <include file="$(find-pkg-share manipulation_planner)/launch/move_group.launch.py"/>
+    <include file="$(find-pkg-share manipulation_planner)/launch/ros2_control.launch.xml"/>
 
     <!-- Arm Node -->
     <node pkg="arms" 
@@ -27,8 +28,12 @@
     <!-- Arm Planner Node -->
     <node pkg="manipulation_planner" 
           exec="arm_movement_planner_node" 
-          name="arm_planner_node" 
-          output="screen"/>
+          name="arm_movement_planner_node" 
+          output="screen">
+
+        <!-- Use simulation time parameter -->
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
 
     <!-- Optional: Robot State Publisher (uncomment if you have a URDF) -->
     <node pkg="robot_state_publisher" 

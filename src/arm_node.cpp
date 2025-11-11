@@ -354,27 +354,27 @@ private:
         }
 
         // Read and publish current state
-        // if(read_current_positions())
-        // {
-        //     joint_states_.header.stamp = this->now();
-        //     joint_states_.position = bits_to_radians(current_position_bits_);
+        if(read_current_positions())
+        {
+            joint_states_.header.stamp = this->now();
+            joint_states_.position = bits_to_radians(current_position_bits_);
             
-        //     // Publish joint states
-        //     pub_joint_state_->publish(joint_states_);
+            // Publish joint states
+            pub_joint_state_->publish(joint_states_);
             
-        //     // Publish arm pose
-        //     for(size_t i = 0; i < num_arm_servos_; i++)
-        //         msg_current_pose_.data[i] = joint_states_.position[i];
-        //     pub_current_pose_->publish(msg_current_pose_);
+            // Publish arm pose
+            for(size_t i = 0; i < num_arm_servos_; i++)
+                msg_current_pose_.data[i] = joint_states_.position[i];
+            pub_current_pose_->publish(msg_current_pose_);
             
-        //     // Publish gripper position (average of gripper servos)
-        //     if(num_gripper_servos_ > 0)
-        //     {
-        //         msg_current_gripper_.data = joint_states_.position[num_arm_servos_] * 
-        //                                    servo_directions_[num_arm_servos_];
-        //         pub_current_gripper_->publish(msg_current_gripper_);
-        //     }
-        // }
+            // Publish gripper position (average of gripper servos)
+            if(num_gripper_servos_ > 0)
+            {
+                msg_current_gripper_.data = joint_states_.position[num_arm_servos_] * 
+                                           servo_directions_[num_arm_servos_];
+                pub_current_gripper_->publish(msg_current_gripper_);
+            }
+        }
         
         pub_current_voltage_->publish(msg_voltage_);
     }
@@ -390,12 +390,12 @@ private:
                 reinterpret_cast<uint16_t *>(&current_position_bits_[i])
             );
 
-            RCLCPP_INFO(
-                this->get_logger(),
-                "Get [ID: %d] [Present Position: %d]",
-                servo_ids_[i],
-                current_position_bits_[i]
-            );
+            // RCLCPP_INFO(
+            //     this->get_logger(),
+            //     "Get [ID: %d] [Present Position: %d]",
+            //     servo_ids_[i],
+            //     current_position_bits_[i]
+            // );
         }
         return true;
     }
