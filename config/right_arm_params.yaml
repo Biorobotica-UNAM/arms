@@ -6,7 +6,7 @@
     
     # Control parameters
     torque_enable: true
-    max_speed: 70
+    max_speed: 40
     
     # Arm servo configuration
     servo_arm_ids: [0, 4, 1, 2]
