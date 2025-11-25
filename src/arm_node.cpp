@@ -266,19 +266,19 @@ private:
     {
         // Subscribers
         sub_goal_pose_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            "/hardware/arm/goal_pose", 10, 
+            "goal_pose", 10, 
             std::bind(&ArmNode::callback_goal_pose, this, std::placeholders::_1));
         
         sub_goal_gripper_ = this->create_subscription<std_msgs::msg::Float64>(
-            "/hardware/arm/goal_gripper", 10,
+            "goal_gripper", 10,
             std::bind(&ArmNode::callback_goal_gripper, this, std::placeholders::_1));
 
         // Publishers
         pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
-        pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("/hardware/arm/current_pose", 10);
-        pub_current_gripper_ = this->create_publisher<std_msgs::msg::Float64>("/hardware/arm/current_gripper", 10);
-        pub_goal_reached_ = this->create_publisher<std_msgs::msg::Bool>("/hardware/arm/goal_reached", 10);
-        pub_current_voltage_ = this->create_publisher<std_msgs::msg::Float64>("/hardware/arm/voltage", 10);
+        pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("current_pose", 10);
+        pub_current_gripper_ = this->create_publisher<std_msgs::msg::Float64>("current_gripper", 10);
+        pub_goal_reached_ = this->create_publisher<std_msgs::msg::Bool>("goal_reached", 10);
+        pub_current_voltage_ = this->create_publisher<std_msgs::msg::Float64>("voltage", 10);
 
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
     }
@@ -305,12 +305,14 @@ private:
 
     void callback_goal_gripper(const std_msgs::msg::Float64::SharedPtr msg)
     {
-        // Set both gripper servos to same position
+        double position = msg->data;
+
         for(size_t i = 0; i < num_gripper_servos_; i++)
         {
             size_t idx = num_arm_servos_ + i;
-            goal_pose_bits_[idx] = servo_directions_[idx] * msg->data * 
+            goal_pose_bits_[idx] = servo_directions_[idx] * position * 
                                   servo_bits_per_radian_[idx] + servo_zeros_[idx];
+            position = -position;
         }
         new_gripper_pose_ = true;
     }
