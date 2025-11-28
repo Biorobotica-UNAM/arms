@@ -20,7 +20,6 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(dynamixel_sdk REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
-find_package(moveit_msgs REQUIRED)
 
 # ============================================
 # Executable: Arm Node
@@ -33,7 +32,6 @@ add_executable(arm_node
 ament_target_dependencies(arm_node
   rclcpp
   std_msgs
-  moveit_msgs
   dynamixel_sdk
   sensor_msgs
   trajectory_msgs
