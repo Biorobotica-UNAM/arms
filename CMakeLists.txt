@@ -31,7 +31,6 @@ ament_target_dependencies(arm_node
   std_msgs
   dynamixel_sdk
   sensor_msgs
-  trajectory_msgs
   tf2_ros
 )
 
