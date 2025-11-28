@@ -1,38 +1,38 @@
 <?xml version="1.0"?>
 <launch>
-    <group>
-        <push_ros_namespace namespace='arms'/>
+    <!-- Arguments -->
+    <arg name="config_file" 
+         default="$(find-pkg-share arms)/config/right_arm_params.yaml"
+         description="Path to the YAML configuration file for arm parameters"/>
+    
+    <arg name="use_sim_time" 
+         default="false"
+         description="Use simulation time"/>
 
-        <!-- Arguments -->
-        <arg name="config_file" 
-             default="$(find-pkg-share arms)/config/right_arm_params.yaml"
-             description="Path to the YAML configuration file for arm parameters"/>
+    <include file="$(find-pkg-share manipulation_planner)/launch/move_group.launch.py"/>
+    <include file="$(find-pkg-share manipulation_planner)/launch/ros2_control.launch.xml"/>
+
+    <!-- Arm Node -->
+    <node pkg="arms" 
+          exec="arm_node" 
+          name="right_arm_node" 
+          output="screen">
         
-        <arg name="use_sim_time" 
-             default="false"
-             description="Use simulation time"/>
+        <!-- Load parameters from YAML file -->
+        <param from="$(var config_file)"/>
+        
+        <!-- Use simulation time parameter -->
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
 
-        <!-- Arm Node -->
-        <node pkg="arms" 
-              exec="arm_node" 
-              name="right_arm_node" 
-              output="screen">
-            
-            <!-- Load parameters from YAML file -->
-            <param from="$(var config_file)"/>
-            
-            <!-- Use simulation time parameter -->
-            <param name="use_sim_time" value="$(var use_sim_time)"/>
-        </node>
+    <!-- Arm Planner Node -->
+    <node pkg="manipulation_planner" 
+          exec="arm_movement_planner_node" 
+          name="arm_movement_planner_node" 
+          output="screen">
 
-        <!-- Optional: Robot State Publisher (uncomment if you have a URDF) -->
-        <node pkg="robot_state_publisher" 
-              exec="robot_state_publisher" 
-              name="robot_state_publisher"
-              output="screen">
-            <param name="robot_description" 
-                   value="$(command 'xacro $(find-pkg-share justina_description)/urdf/justina/justina.xacro')"/>
-            <param name="use_sim_time" value="$(var use_sim_time)"/>
-        </node>
-   </group>
+        <!-- Use simulation time parameter -->
+        <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
+
 </launch>
