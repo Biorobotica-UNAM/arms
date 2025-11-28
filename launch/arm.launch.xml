@@ -10,7 +10,7 @@
          description="Use simulation time"/>
 
     <group>
-        <ros_puch_namespace namespace = "arms"/>
+        <ros_push_namespace namespace = "arms"/>
         <!-- Arm Node -->
         <node pkg="arms" 
               exec="arm_node" 
