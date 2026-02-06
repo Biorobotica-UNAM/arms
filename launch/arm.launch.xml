@@ -1,15 +1,11 @@
 <?xml version="1.0"?>
 <launch>
 
-  <!-- ===================== -->
-  <!--      Arguments        -->
-  <!-- ===================== -->
+  <!-- Arguments -->
   <arg name="namespace" default="hardware"/>
   <arg name="use_sim_time" default="false"/>
 
-  <!-- ===================== -->
-  <!--        Arm Node       -->
-  <!-- ===================== -->
+  <!-- Arm node -->
   <group>
     <push_ros_namespace namespace="$(var namespace)"/>
 
@@ -20,7 +16,8 @@
       output="screen">
 
       <param name="use_sim_time" value="$(var use_sim_time)"/>
-      <rosparam file="$(find-pkg-share arms)/config/right_arm_params.yaml"/>
+
+      <parameters file="$(find-pkg-share arms)/config/right_arm_params.yaml"/>
 
     </node>
   </group>
