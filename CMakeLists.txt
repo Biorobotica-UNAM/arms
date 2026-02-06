@@ -17,6 +17,7 @@ find_package(std_msgs REQUIRED)
 find_package(dynamixel_sdk REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 
 # ============================================
 # Executable: Arm Node
