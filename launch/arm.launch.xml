@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-  <arg name="namespace" default="hardware"/>
+  <arg name="namespace" default="arms"/>
   <arg name="use_sim_time" default="false"/>
 
   <group>
