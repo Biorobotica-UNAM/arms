@@ -5,7 +5,7 @@
   <arg name="use_sim_time" default="false"/>
 
   <group>
-    <push_ros_namespace namespace="$(var namespace)"/>
+    <push-ros-namespace namespace="$(var namespace)"/>
 
     <node
       pkg="arms"
