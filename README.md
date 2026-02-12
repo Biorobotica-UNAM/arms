@@ -1,5 +1,5 @@
 # arms
-This repository provides a ROS2 package to control the Justina's robotic arms and grippers.
+This repository provides a ROS2 package to control Justina's robotic arms and grippers.
 
 ## Configuration
 The arms have 4-DOF using the Dynamixel motors in the following configuration:
@@ -9,6 +9,8 @@ The arms have 4-DOF using the Dynamixel motors in the following configuration:
 * *Elbow*: 1 x MX-106
 * *Wrist*: 1 x MX-64
 * *Jaws*: 2 x MX-28
+
+The communication with the motors is done via RS-485 @ 1Mbps.
 
 ## Description
 The node receives the position of each motor in radians and converts it into bits. Those bits are written to the motor's registers using the Dynamixel SDK. To install this dependency run the script `scripts/setup_justina.sh` in Justina repository. Or you can run the following command in terminal:
