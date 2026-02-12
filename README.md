@@ -1,5 +1,5 @@
 # arms
-This repository provides a ROS module to control the Justina's robotic arms and grippers.
+This repository provides a ROS2 package to control the Justina's robotic arms and grippers.
 
 ## Configuration
 The arms have 4-DOF using the Dynamixel motors in the following configuration:
@@ -29,8 +29,8 @@ The type of message for both topics is `std_msgs::msg::Float64MultiArray`.
 
 At the same time, the node is publishing to the following topics:
 
-* `/joint_states` (`sensor_msgs::msg::JointState`) - Publishes the positions of the joints.
-* `/current_pose` (`std_msgs::msg::Float64MultiArray`) - Publishes the current positions of the arm's motor.
-* `/current_gripper` (`std_msgs::msg::Float64`) - Pusblishes the current position of the gripper.
-* `/goal_reached` (`std_msgs::msg::Bool`) - Indicates wether the position in every motor was reached or not.
-* `/voltage` (`std_msgs::msg::Float64`) - Indicates the voltage level of the motors.
+* `/joint_states` [`sensor_msgs::msg::JointState`] - Publishes the positions of the joints.
+* `/current_pose` [`std_msgs::msg::Float64MultiArray`] - Publishes the current positions of the arm's motor.
+* `/current_gripper` [`std_msgs::msg::Float64`] - Pusblishes the current position of the gripper.
+* `/goal_reached` [`std_msgs::msg::Bool`] - Indicates whether the position in every motor was reached or not.
+* `/voltage` [`std_msgs::msg::Float64`] - Indicates the voltage level of the motors.
