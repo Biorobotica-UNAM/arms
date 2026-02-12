@@ -4,16 +4,18 @@ This repository provides a ROS module to control the Justina's robotic arms and 
 ## Configuration
 The arms have 4-DOF using the Dynamixel motors in the following configuration:
 
-* _Shoulder_: 2 x MX-106
-* _Arm_: 1 x MX-64
-* _Elbow_: 1 x MX-106
-* _Wrist_: 1 x MX-64
-* _Jaws_: 2 x MX-28
+* *Shoulder*: 2 x MX-106
+* *Arm*: 1 x MX-64
+* *Elbow*: 1 x MX-106
+* *Wrist*: 1 x MX-64
+* *Jaws*: 2 x MX-28
 
 ## Description
 The node receives the position of each motor in radians and converts it into bits. Those bits are written to the motor's registers using the Dynamixel SDK. To install this dependency run the script `scripts/setup_justina.sh` in Justina repository. Or you can run the following command in terminal:
 
-`sudo apt install ros-jazzy-dynamixel-sdk`
+```bash
+sudo apt install ros-jazzy-dynamixel-sdk
+```
 
 Additionally, it pusblishes the JointStates of the arm to be visualized in RViz.
 
