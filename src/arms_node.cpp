@@ -100,13 +100,13 @@ private:
         this->declare_parameter<int>("max_speed", 20);
         this->declare_parameter<std::string>("service_name", "move_arm");
 
-        this->declare_parameter<std::vector<int64_t>>("servo_ids", {});
-        this->declare_parameter<std::vector<double>>("servo_bits_per_radian", {});
-        this->declare_parameter<std::vector<int64_t>>("servo_zeros", {});
-        this->declare_parameter<std::vector<int64_t>>("servo_directions", {});
-        this->declare_parameter<std::vector<int64_t>>("servo_min_limits", {});
-        this->declare_parameter<std::vector<int64_t>>("servo_max_limits", {});
-        this->declare_parameter<std::vector<std::string>>("joint_names", {});
+        this->declare_parameter<std::vector<int64_t>>("servo_ids", std::vector<int64_t>{});
+		this->declare_parameter<std::vector<double>>("servo_bits_per_radian", std::vector<double>{});
+		this->declare_parameter<std::vector<int64_t>>("servo_zeros", std::vector<int64_t>{});
+		this->declare_parameter<std::vector<int64_t>>("servo_directions", std::vector<int64_t>{});
+		this->declare_parameter<std::vector<int64_t>>("servo_min_limits", std::vector<int64_t>{});
+		this->declare_parameter<std::vector<int64_t>>("servo_max_limits", std::vector<int64_t>{});
+		this->declare_parameter<std::vector<std::string>>("joint_names", std::vector<std::string>{});
 
         port_name_ = this->get_parameter("port").as_string();
         if(port_name_.empty())
