@@ -1,10 +1,11 @@
 right_arm_node:		
 	ros__parameters:
-		service_name: "move_right_arm"
+		simulation: true
 		port: "/dev/rightArm"
 		baudrate: 1000000
 		torque_enable: true
 		max_speed: 20
+		service_name: "move_right_arm"
 
 		servo_ids: [0, 2, 4, 5, 6, 7]
 		servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
