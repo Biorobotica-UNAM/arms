@@ -22,7 +22,7 @@ add_executable(arms_node
   src/arms_node.cpp
 )
 
-ament_target_dependencies(arm_node
+ament_target_dependencies(arms_node
   rclcpp
   std_msgs
   dynamixel_sdk
