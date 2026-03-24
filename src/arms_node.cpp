@@ -62,6 +62,7 @@ private:
     dynamixel::PacketHandler* packet_handler_;
 
     // Parameters
+	bool simulation_; 
     std::string port_name_;
     int baudrate_;
     bool torque_enable_;
