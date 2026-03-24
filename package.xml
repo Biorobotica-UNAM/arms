@@ -3,29 +3,20 @@
 <package format="3">
   <name>arms</name>
   <version>1.0.0</version>
-  <description>TODO: Package descriptio</description>
-  <maintainer email="rafael.cuellarr@ingenieria.unam.edu">Rafael Cuellar</maintainer>
+  <description>Arms hardware control node</description>
+  <maintainer email="marco.soriano5102@comunidad.unam.mx">Marco Soriano</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- Core ROS2 dependencies -->
   <depend>rclcpp</depend>
-  
-  <!-- Message/Service dependencies -->
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
   <depend>moveit_msgs</depend>
-
-  <!-- TF2 dependencies -->
   <depend>tf2</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>tf2_ros</depend>
-
-  <!-- Dynamixel SDK dependency -->
   <depend>dynamixel_sdk</depend>
-
-  <!-- Sensor and trajectory messages -->
   <depend>sensor_msgs</depend>
   <depend>trayectory_msgs</depend>
 

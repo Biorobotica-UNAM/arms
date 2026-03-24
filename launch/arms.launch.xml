@@ -1,0 +1,18 @@
+<launch>
+
+  <group>
+    <push_ros_namespace namespace="arms"/>
+
+    <node pkg="arms" exec="arms_node" name="right_arm_node" output="screen">
+      <param from="$(find-pkg-share arms)/config/arms_parameters.yaml"
+             namespace="arms.right"/>
+    </node>
+
+    <node pkg="arms" exec="arms_node" name="left_arm_node" output="screen">
+      <param from="$(find-pkg-share arms)/config/arms_parameters.yaml"
+             namespace="arms.left"/>
+    </node>
+
+  </group>
+
+</launch>
