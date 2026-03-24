@@ -1,19 +1,21 @@
-right_arm_node:		
-	ros__parameters:
-		simulation: true
-		port: "/dev/rightArm"
-		baudrate: 1000000
-		torque_enable: true
-		max_speed: 20
-		service_name: "move_right_arm"
+right_arm_node:
+  ros__parameters:
+    simulation: true
+    port: "/dev/rightArm"
+    baudrate: 1000000
+    torque_enable: true
+    max_speed: 20
+    service_name: "move_right_arm"
 
-		servo_ids: [0, 2, 4, 5, 6, 7]
-		servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
-		servo_zeros: [1950, 2040, 2100, 2170, 2050, 2046]
+    servo_ids: [0, 2, 4, 5, 6, 7]
+    servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
+    servo_zeros: [1950, 2040, 2100, 2170, 2050, 2046]
 
-		servo_min_limits: [830, 1020, 0, 920, 0, 2000]
-		servo_max_limits: [2990, 3085, 4095, 3200, 4095, 2100]
+    servo_min_limits: [830, 1020, 0, 920, 0, 2000]
+    servo_max_limits: [2990, 3085, 4095, 3200, 4095, 2100]
 
-		servo_directions: [1, 1, 1, 1, 1, 1]
+    servo_directions: [1, 1, 1, 1, 1, 1]
 
-		joint_names: ["rf_shoulder_joint", "rs_shoulder_joint", "r_arm_twist_joint", "r_elbow_joint", "r_wrist_joint", "r_hand_joint"]
+    joint_names:
+      ["rf_shoulder_joint", "rs_shoulder_joint", "r_arm_twist_joint",
+       "r_elbow_joint", "r_wrist_joint", "r_hand_joint"]
