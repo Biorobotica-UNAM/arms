@@ -4,13 +4,11 @@
     <push_ros_namespace namespace="arms"/>
 
     <node pkg="arms" exec="arms_node" name="right_arm_node" output="screen">
-      <param from="$(find-pkg-share arms)/config/arms_parameters.yaml"
-             namespace="arms.right"/>
+      <param from="$(find-pkg-share arms)/config/right_arm.yaml"/>
     </node>
 
     <node pkg="arms" exec="arms_node" name="left_arm_node" output="screen">
-      <param from="$(find-pkg-share arms)/config/arms_parameters.yaml"
-             namespace="arms.left"/>
+      <param from="$(find-pkg-share arms)/config/left_arm.yaml"/>
     </node>
 
   </group>
