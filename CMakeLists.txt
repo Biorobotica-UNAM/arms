@@ -17,6 +17,7 @@ find_package(dynamixel_sdk REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(trajectory_msgs REQUIRED)
+find_package(arms_interfaces REQUIRED)
 
 add_executable(arms_node
   src/arms_node.cpp
@@ -29,6 +30,7 @@ ament_target_dependencies(arms_node
   sensor_msgs
   trajectory_msgs
   tf2_ros
+  arms_interfaces
 )
 
 install(TARGETS
