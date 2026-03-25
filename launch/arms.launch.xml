@@ -1,21 +1,22 @@
 <launch>
+
   <arg name="use_sim_time" default="false"/>
 
   <group>
-    <push-ros-namespace namespace="arms">
+    <push-ros-namespace namespace="arms"/>
 
-      <!-- Right Arm -->
-      <node pkg="arms" exec="arms_node" name="right_arm_node" output="screen">
-        <param from="$(find-pkg-share arms)/config/right_arm.yaml"/>
-        <param name="use_sim_time" value="$(var use_sim_time)"/>
-      </node>
+    <!-- Right Arm -->
+    <node pkg="arms" exec="arms_node" name="right_arm_node" output="screen">
+      <param from="$(find-pkg-share arms)/config/right_arm.yaml"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
 
-      <!-- Left Arm -->
-      <node pkg="arms" exec="arms_node" name="left_arm_node" output="screen">
-        <param from="$(find-pkg-share arms)/config/left_arm.yaml"/>
-        <param name="use_sim_time" value="$(var use_sim_time)"/>
-      </node>
+    <!-- Left Arm -->
+    <node pkg="arms" exec="arms_node" name="left_arm_node" output="screen">
+      <param from="$(find-pkg-share arms)/config/left_arm.yaml"/>
+      <param name="use_sim_time" value="$(var use_sim_time)"/>
+    </node>
 
-    </push-ros-namespace>
   </group>
+
 </launch>
