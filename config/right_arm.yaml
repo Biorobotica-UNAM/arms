@@ -1,9 +1,9 @@
-right_arm_node:
+/**:
   ros__parameters:
     simulation: true
     port: "/dev/rightArm"
     baudrate: 1000000
-    torque_enable: true
+    torque_enable: false
     max_speed: 20
     service_name: "move_right_arm"
 

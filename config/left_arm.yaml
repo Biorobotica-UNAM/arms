@@ -1,4 +1,4 @@
-left_arm_node:
+/**:
   ros__parameters:
     simulation: true
     port: "/dev/leftArm"
