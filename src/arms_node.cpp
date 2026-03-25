@@ -132,6 +132,8 @@ private:
         auto min_l = this->get_parameter("servo_min_limits").as_integer_array();
         auto max_l = this->get_parameter("servo_max_limits").as_integer_array();
 
+		joint_names_ = this->get_parameter("joint_names").as_string_array();
+
         servo_bits_per_radian_ = this->get_parameter("servo_bits_per_radian").as_double_array();
 
         num_servos_ = ids.size();
