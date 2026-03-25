@@ -5,14 +5,14 @@
 		<!-- Right Arm -->
 		<node pkg="arms" exec="arms_node" name="right_arm_node" output="screen">
 			<param from="$(find-pkg-share arms)/config/right_arm.yaml"/>
-			<remap from="joint_states" to="hardware/joint_states"/>
+			<remap from="joint_states" to="/hardware/joint_states"/>
 			<remap from="current_pose" to="right_arm/current_pose"/>
 		</node>
 
 		<!-- Left Arm -->
 		<node pkg="arms" exec="arms_node" name="left_arm_node" output="screen">
 			<param from="$(find-pkg-share arms)/config/left_arm.yaml"/>
-			<remap from="joint_states" to="hardware/joint_states"/>
+			<remap from="joint_states" to="/hardware/joint_states"/>
 			<remap from="current_pose" to="left_arm/current_pose"/>
 		</node>
 
