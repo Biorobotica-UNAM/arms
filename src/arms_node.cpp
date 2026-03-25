@@ -66,7 +66,9 @@ private:
     int baudrate_;
     bool torque_enable_;
     int max_speed_;
-    std::string service_name_;
+	std::string joint_states_topic_;
+	std::string current_pose_topic_;
+	std::string service_name_;
     bool simulation_;
 
     std::vector<int> servo_ids_;
@@ -100,7 +102,10 @@ private:
         this->declare_parameter<int>("baudrate", 1000000);
         this->declare_parameter<bool>("torque_enable", true);
         this->declare_parameter<int>("max_speed", 20);
-        this->declare_parameter<std::string>("service_name", "move_arm");
+        
+		this->declare_parameter<std::string>("joint_states_topic", "joint_states");
+		this->declare_parameter<std::string>("current_pose_topic", "current_pose");
+		this->declare_parameter<std::string>("arm_controller_service", "move_arm");
 
         this->declare_parameter<std::vector<int64_t>>("servo_ids", std::vector<int64_t>{});
         this->declare_parameter<std::vector<double>>("servo_bits_per_radian", std::vector<double>{});
@@ -116,8 +121,10 @@ private:
         baudrate_ = this->get_parameter("baudrate").as_int();
         torque_enable_ = this->get_parameter("torque_enable").as_bool();
         max_speed_ = this->get_parameter("max_speed").as_int();
-        service_name_ = this->get_parameter("service_name").as_string();
-        joint_names_ = this->get_parameter("joint_names").as_string_array();
+
+        joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
+		current_pose_topic_ = this->get_parameter("current_pose_topic").as_string();
+		service_name_ = this->get_parameter("arm_controller_service").as_string();
 
         auto ids = this->get_parameter("servo_ids").as_integer_array();
         auto zeros = this->get_parameter("servo_zeros").as_integer_array();
@@ -198,12 +205,9 @@ private:
     // =========================
     void setup_interfaces()
     {
-        pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
-        pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("current_pose", 10);
-
-        srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(
-            service_name_,
-            std::bind(&ArmsNode::move_service, this, _1, _2));
+        pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
+    	pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(current_pose_topic_, 10);
+    	srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(service_name_, std::bind(&ArmsNode::move_service, this, _1, _2));
     }
 
     void initialize_messages()

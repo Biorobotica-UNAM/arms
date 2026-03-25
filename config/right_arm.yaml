@@ -5,7 +5,10 @@
     baudrate: 1000000
     torque_enable: false
     max_speed: 20
-    service_name: "move_right_arm"
+
+    joint_states_topic: "right_arm/joint_states"
+    current_pose_topic: "right_arm/current_pose"
+    arm_controller_service: "move_right_arm"
 
     servo_ids: [0, 2, 4, 5, 6, 7]
     servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
@@ -13,7 +16,6 @@
 
     servo_min_limits: [830, 1020, 0, 920, 0, 2000]
     servo_max_limits: [2990, 3085, 4095, 3200, 4095, 2100]
-
     servo_directions: [1, 1, 1, 1, 1, 1]
 
     joint_names:
