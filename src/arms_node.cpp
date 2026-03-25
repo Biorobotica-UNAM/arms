@@ -198,7 +198,7 @@ private:
     // =========================
     void setup_interfaces()
     {
-        pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
+        pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
         pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("current_pose", 10);
 
         srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(
