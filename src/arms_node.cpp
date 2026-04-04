@@ -38,7 +38,17 @@ public:
         setup_interfaces();
         initialize_messages();
 
-        const std::vector<double> starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+
+		if (service_name_.find("left") != std::string::npos)
+		{
+			starting_position = {0.0, 0.0, 0.3, 1.2, 0.0, 1.2};
+		}
+
+		if (service_name_.find("right") != std::string::npos)
+		{
+			starting_position = {0.0, 0.0, -0.3, 1.2, 0.0, 1.2};
+		}
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
@@ -228,108 +238,122 @@ private:
     // MOVEMENT CONTROL
     // =========================
     bool move_to_position(const std::vector<double>& positions, std::string& message)
-    {
-        if (positions.size() != num_servos_)
-        {
-            message = "Invalid joint size";
-            return false;
-        }
+	{
+		if (positions.size() != num_servos_)
+		{
+		    message = "Invalid joint size";
+		    return false;
+		}
 
-        if (!read_current_positions())
-        {
-            message = "Cannot read servo positions. Check motor power";
-            return false;
-        }
+		if (simulation_)
+		{
+		    for (size_t i = 0; i < num_servos_; i++)
+		    {
+		        goal_pose_bits_[i] = static_cast<int>(
+		            servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]
+		        );
+		        current_position_bits_[i] = goal_pose_bits_[i];
+		    }
 
-        for (size_t i = 0; i < num_servos_; i++)
-        {
-            int raw = servo_directions_[i] * positions[i] *
-                      servo_bits_per_radian_[i] + servo_zeros_[i];
+		    message = "Goal reached (simulation)";
+		    return true;
+		}
 
-            if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i])
-            {
-                double min_rad = servo_directions_[i] *
-                                 (servo_min_limits_[i] - servo_zeros_[i]) /
-                                 servo_bits_per_radian_[i];
-                double max_rad = servo_directions_[i] *
-                                 (servo_max_limits_[i] - servo_zeros_[i]) /
-                                 servo_bits_per_radian_[i];
-                if (min_rad > max_rad) std::swap(min_rad, max_rad);
+		if (!read_current_positions())
+		{
+		    message = "Cannot read servo positions. Check motor power";
+		    return false;
+		}
 
-                message = "Joint " + joint_names_[i] +
-                          " out of range. Requested: " + std::to_string(positions[i]) +
-                          " rad. Limits: [" + std::to_string(min_rad) +
-                          ", " + std::to_string(max_rad) + "] rad";
-                return false;
-            }
+		for (size_t i = 0; i < num_servos_; i++)
+		{
+		    int raw = servo_directions_[i] * positions[i] *
+		              servo_bits_per_radian_[i] + servo_zeros_[i];
 
-            goal_pose_bits_[i] = raw;
-        }
+		    if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i])
+		    {
+		        double min_rad = servo_directions_[i] *
+		                         (servo_min_limits_[i] - servo_zeros_[i]) /
+		                         servo_bits_per_radian_[i];
+		        double max_rad = servo_directions_[i] *
+		                         (servo_max_limits_[i] - servo_zeros_[i]) /
+		                         servo_bits_per_radian_[i];
+		        if (min_rad > max_rad) std::swap(min_rad, max_rad);
 
-        write_goal_positions();
+		        message = "Joint " + joint_names_[i] +
+		                  " out of range. Requested: " + std::to_string(positions[i]) +
+		                  " rad. Limits: [" + std::to_string(min_rad) +
+		                  ", " + std::to_string(max_rad) + "] rad";
+		        return false;
+		    }
 
-        const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
-        const int    tolerance_bits        = 20;
-        const int    polling_ms            = 20;
+		    goal_pose_bits_[i] = raw;
+		}
 
-        if (!read_current_positions())
-        {
-            message = "Cannot read servo positions. Check motor power";
-            return false;
-        }
+		write_goal_positions();
 
-        int max_distance_bits = 0;
-        for (size_t i = 0; i < num_servos_; i++)
-        {
-            int dist = std::abs(goal_pose_bits_[i] - current_position_bits_[i]);
-            max_distance_bits = std::max(max_distance_bits, dist);
-        }
+		const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
+		const int    tolerance_bits        = 20;
+		const int    polling_ms            = 20;
 
-        double max_distance_rad = max_distance_bits /
-                                  *std::max_element(servo_bits_per_radian_.begin(),
-                                                    servo_bits_per_radian_.end());
+		if (!read_current_positions())
+		{
+		    message = "Cannot read servo positions. Check motor power";
+		    return false;
+		}
 
-        int timeout_ms = static_cast<int>((max_distance_rad / max_speed_rad_per_sec) * 1000.0);
+		int max_distance_bits = 0;
+		for (size_t i = 0; i < num_servos_; i++)
+		{
+		    int dist = std::abs(goal_pose_bits_[i] - current_position_bits_[i]);
+		    max_distance_bits = std::max(max_distance_bits, dist);
+		}
 
-        RCLCPP_INFO(this->get_logger(), "Moving %.3f rad max, timeout: %d ms",
-                    max_distance_rad, timeout_ms);
+		double max_distance_rad = max_distance_bits /
+		                          *std::max_element(servo_bits_per_radian_.begin(),
+		                                            servo_bits_per_radian_.end());
 
-        int  elapsed_ms   = 0;
-        bool goal_reached = false;
+		int timeout_ms = static_cast<int>((max_distance_rad / max_speed_rad_per_sec) * 1000.0);
 
-        while (elapsed_ms < timeout_ms)
-        {
-            read_current_positions();
+		RCLCPP_INFO(this->get_logger(), "Moving %.3f rad max, timeout: %d ms",
+		            max_distance_rad, timeout_ms);
 
-            goal_reached = true;
-            for (size_t i = 0; i < num_servos_; i++)
-            {
-                if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
-                {
-                    goal_reached = false;
-                    break;
-                }
-            }
+		int  elapsed_ms   = 0;
+		bool goal_reached = false;
 
-            if (goal_reached) break;
+		while (elapsed_ms < timeout_ms)
+		{
+		    read_current_positions();
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
-            elapsed_ms += polling_ms;
-        }
+		    goal_reached = true;
+		    for (size_t i = 0; i < num_servos_; i++)
+		    {
+		        if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
+		        {
+		            goal_reached = false;
+		            break;
+		        }
+		    }
 
-        message = goal_reached ? "Goal reached" : "Timeout: goal not reached";
-        return goal_reached;
-    }
+		    if (goal_reached) break;
+
+		    std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
+		    elapsed_ms += polling_ms;
+		}
+
+		message = goal_reached ? "Goal reached" : "Timeout: goal not reached";
+		return goal_reached;
+	}
 
     // =========================
     // SERVICE
     // =========================
     void move_service(
-        const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
-        std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
-    {
-        response->success = move_to_position(request->positions, response->message);
-    }
+		const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
+		std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
+	{
+		response->success = move_to_position(request->positions, response->message);
+	}
 
     // =========================
     // TIMER
