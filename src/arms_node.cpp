@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <atomic>
+#include <future>
 #include <memory>
 #include <chrono>
 #include <thread>
 
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "arms_interfaces/srv/move_arms.hpp"
@@ -40,15 +43,11 @@ public:
 
         std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
 
-		if (service_name_.find("left") != std::string::npos)
-		{
-			starting_position = {0.0, 0.0, 0.3, 1.2, 0.0, 1.2};
-		}
+        if (service_name_.find("left") != std::string::npos)
+            starting_position = {0.0, 0.0, 0.3, 1.2, 0.0, 1.2};
 
-		if (service_name_.find("right") != std::string::npos)
-		{
-			starting_position = {0.0, 0.0, -0.3, 1.2, 0.0, 1.2};
-		}
+        if (service_name_.find("right") != std::string::npos)
+            starting_position = {0.0, 0.0, -0.3, 1.2, 0.0, 1.2};
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
@@ -66,6 +65,10 @@ public:
 
     ~ArmsNode()
     {
+        motion_cancelled_.store(true);
+        if (motion_future_.valid())
+            motion_future_.wait();
+
         if(port_handler_ != nullptr)
             port_handler_->closePort();
     }
@@ -76,7 +79,9 @@ private:
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr pub_joint_state_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_current_pose_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_goal_reached_;
     rclcpp::Service<arms_interfaces::srv::MoveArms>::SharedPtr srv_move_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr sub_goal_pose_;
 
     // Dynamixel
     dynamixel::PortHandler* port_handler_ = nullptr;
@@ -90,6 +95,8 @@ private:
     std::string joint_states_topic_;
     std::string current_pose_topic_;
     std::string service_name_;
+    std::string goal_pose_topic_;
+    std::string goal_reached_topic_;
     bool simulation_;
 
     std::vector<int> servo_ids_;
@@ -115,6 +122,11 @@ private:
 
     rclcpp::Time last_config_attempt_{0, 0, RCL_ROS_TIME};
 
+    // Motion concurrency control
+    std::atomic<bool> motion_active_{false};
+    std::atomic<bool> motion_cancelled_{false};
+    std::future<void> motion_future_;
+
     // =========================
     // PARAMETERS
     // =========================
@@ -129,6 +141,8 @@ private:
         this->declare_parameter<std::string>("joint_states_topic", "joint_states");
         this->declare_parameter<std::string>("current_pose_topic", "current_pose");
         this->declare_parameter<std::string>("arm_controller_service", "move_arm");
+        this->declare_parameter<std::string>("goal_pose_topic", "goal_pose");
+        this->declare_parameter<std::string>("goal_reached_topic", "goal_reached");
 
         this->declare_parameter<std::vector<int64_t>>("servo_ids", std::vector<int64_t>{});
         this->declare_parameter<std::vector<double>>("servo_bits_per_radian", std::vector<double>{});
@@ -138,23 +152,25 @@ private:
         this->declare_parameter<std::vector<int64_t>>("servo_max_limits", std::vector<int64_t>{});
         this->declare_parameter<std::vector<std::string>>("joint_names", std::vector<std::string>{});
 
-        simulation_ = this->get_parameter("simulation").as_bool();
-        port_name_ = this->get_parameter("port").as_string();
-        baudrate_ = this->get_parameter("baudrate").as_int();
+        simulation_    = this->get_parameter("simulation").as_bool();
+        port_name_     = this->get_parameter("port").as_string();
+        baudrate_      = this->get_parameter("baudrate").as_int();
         torque_enable_ = this->get_parameter("torque_enable").as_bool();
-        max_speed_ = this->get_parameter("max_speed").as_int();
+        max_speed_     = this->get_parameter("max_speed").as_int();
 
         joint_states_topic_ = this->get_parameter("joint_states_topic").as_string();
         current_pose_topic_ = this->get_parameter("current_pose_topic").as_string();
-        service_name_ = this->get_parameter("arm_controller_service").as_string();
+        service_name_       = this->get_parameter("arm_controller_service").as_string();
+        goal_pose_topic_    = this->get_parameter("goal_pose_topic").as_string();
+        goal_reached_topic_ = this->get_parameter("goal_reached_topic").as_string();
 
-        auto ids = this->get_parameter("servo_ids").as_integer_array();
+        auto ids   = this->get_parameter("servo_ids").as_integer_array();
         auto zeros = this->get_parameter("servo_zeros").as_integer_array();
-        auto dirs = this->get_parameter("servo_directions").as_integer_array();
+        auto dirs  = this->get_parameter("servo_directions").as_integer_array();
         auto min_l = this->get_parameter("servo_min_limits").as_integer_array();
         auto max_l = this->get_parameter("servo_max_limits").as_integer_array();
 
-        joint_names_ = this->get_parameter("joint_names").as_string_array();
+        joint_names_           = this->get_parameter("joint_names").as_string_array();
         servo_bits_per_radian_ = this->get_parameter("servo_bits_per_radian").as_double_array();
 
         num_servos_ = ids.size();
@@ -165,9 +181,9 @@ private:
             return false;
         }
 
-        for(auto v : ids) servo_ids_.push_back((int)v);
+        for(auto v : ids)   servo_ids_.push_back((int)v);
         for(auto v : zeros) servo_zeros_.push_back((int)v);
-        for(auto v : dirs) servo_directions_.push_back((int)v);
+        for(auto v : dirs)  servo_directions_.push_back((int)v);
         for(auto v : min_l) servo_min_limits_.push_back((int)v);
         for(auto v : max_l) servo_max_limits_.push_back((int)v);
 
@@ -193,14 +209,11 @@ private:
             return false;
         }
 
-        port_handler_ = dynamixel::PortHandler::getPortHandler(port_name_.c_str());
+        port_handler_   = dynamixel::PortHandler::getPortHandler(port_name_.c_str());
         packet_handler_ = dynamixel::PacketHandler::getPacketHandler(1.0);
 
-        if (!port_handler_->openPort())
-            return false;
-
-        if (!port_handler_->setBaudRate(baudrate_))
-            return false;
+        if (!port_handler_->openPort())        return false;
+        if (!port_handler_->setBaudRate(baudrate_)) return false;
 
         current_position_bits_.resize(num_servos_, 0);
         goal_pose_bits_.resize(num_servos_, 0);
@@ -223,9 +236,16 @@ private:
     // =========================
     void setup_interfaces()
     {
-        pub_joint_state_ = this->create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
+        pub_joint_state_  = this->create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
         pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(current_pose_topic_, 10);
-        srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(service_name_, std::bind(&ArmsNode::move_service, this, _1, _2));
+        pub_goal_reached_ = this->create_publisher<std_msgs::msg::Bool>(goal_reached_topic_, 10);
+
+        srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(
+            service_name_, std::bind(&ArmsNode::move_service, this, _1, _2));
+
+        sub_goal_pose_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+            goal_pose_topic_, 10,
+            std::bind(&ArmsNode::goal_pose_callback, this, _1));
     }
 
     void initialize_messages()
@@ -238,122 +258,159 @@ private:
     // MOVEMENT CONTROL
     // =========================
     bool move_to_position(const std::vector<double>& positions, std::string& message)
-	{
-		if (positions.size() != num_servos_)
-		{
-		    message = "Invalid joint size";
-		    return false;
-		}
+    {
+        if (positions.size() != num_servos_)
+        {
+            message = "Invalid joint size";
+            return false;
+        }
 
-		if (simulation_)
-		{
-		    for (size_t i = 0; i < num_servos_; i++)
-		    {
-		        goal_pose_bits_[i] = static_cast<int>(
-		            servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]
-		        );
-		        current_position_bits_[i] = goal_pose_bits_[i];
-		    }
+        if (simulation_)
+        {
+            for (size_t i = 0; i < num_servos_; i++)
+            {
+                goal_pose_bits_[i] = static_cast<int>(
+                    servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]
+                );
+                current_position_bits_[i] = goal_pose_bits_[i];
+            }
 
-		    message = "Goal reached (simulation)";
-		    return true;
-		}
+            message = "Goal reached (simulation)";
+            return true;
+        }
 
-		if (!read_current_positions())
-		{
-		    message = "Cannot read servo positions. Check motor power";
-		    return false;
-		}
+        if (!read_current_positions())
+        {
+            message = "Cannot read servo positions. Check motor power";
+            return false;
+        }
 
-		for (size_t i = 0; i < num_servos_; i++)
-		{
-		    int raw = servo_directions_[i] * positions[i] *
-		              servo_bits_per_radian_[i] + servo_zeros_[i];
+        for (size_t i = 0; i < num_servos_; i++)
+        {
+            int raw = servo_directions_[i] * positions[i] *
+                      servo_bits_per_radian_[i] + servo_zeros_[i];
 
-		    if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i])
-		    {
-		        double min_rad = servo_directions_[i] *
-		                         (servo_min_limits_[i] - servo_zeros_[i]) /
-		                         servo_bits_per_radian_[i];
-		        double max_rad = servo_directions_[i] *
-		                         (servo_max_limits_[i] - servo_zeros_[i]) /
-		                         servo_bits_per_radian_[i];
-		        if (min_rad > max_rad) std::swap(min_rad, max_rad);
+            if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i])
+            {
+                double min_rad = servo_directions_[i] *
+                                 (servo_min_limits_[i] - servo_zeros_[i]) /
+                                 servo_bits_per_radian_[i];
+                double max_rad = servo_directions_[i] *
+                                 (servo_max_limits_[i] - servo_zeros_[i]) /
+                                 servo_bits_per_radian_[i];
+                if (min_rad > max_rad) std::swap(min_rad, max_rad);
 
-		        message = "Joint " + joint_names_[i] +
-		                  " out of range. Requested: " + std::to_string(positions[i]) +
-		                  " rad. Limits: [" + std::to_string(min_rad) +
-		                  ", " + std::to_string(max_rad) + "] rad";
-		        return false;
-		    }
+                message = "Joint " + joint_names_[i] +
+                          " out of range. Requested: " + std::to_string(positions[i]) +
+                          " rad. Limits: [" + std::to_string(min_rad) +
+                          ", " + std::to_string(max_rad) + "] rad";
+                return false;
+            }
 
-		    goal_pose_bits_[i] = raw;
-		}
+            goal_pose_bits_[i] = raw;
+        }
 
-		write_goal_positions();
+        write_goal_positions();
 
-		const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
-		const int    tolerance_bits        = 20;
-		const int    polling_ms            = 20;
+        const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
+        const int    tolerance_bits        = 20;
+        const int    polling_ms            = 20;
 
-		if (!read_current_positions())
-		{
-		    message = "Cannot read servo positions. Check motor power";
-		    return false;
-		}
+        if (!read_current_positions())
+        {
+            message = "Cannot read servo positions. Check motor power";
+            return false;
+        }
 
-		int max_distance_bits = 0;
-		for (size_t i = 0; i < num_servos_; i++)
-		{
-		    int dist = std::abs(goal_pose_bits_[i] - current_position_bits_[i]);
-		    max_distance_bits = std::max(max_distance_bits, dist);
-		}
+        int max_distance_bits = 0;
+        for (size_t i = 0; i < num_servos_; i++)
+        {
+            int dist = std::abs(goal_pose_bits_[i] - current_position_bits_[i]);
+            max_distance_bits = std::max(max_distance_bits, dist);
+        }
 
-		double max_distance_rad = max_distance_bits /
-		                          *std::max_element(servo_bits_per_radian_.begin(),
-		                                            servo_bits_per_radian_.end());
+        double max_distance_rad = max_distance_bits /
+                                  *std::max_element(servo_bits_per_radian_.begin(),
+                                                    servo_bits_per_radian_.end());
 
-		int timeout_ms = static_cast<int>((max_distance_rad / max_speed_rad_per_sec) * 1000.0);
+        int timeout_ms = static_cast<int>((max_distance_rad / max_speed_rad_per_sec) * 1000.0);
 
-		RCLCPP_INFO(this->get_logger(), "Moving %.3f rad max, timeout: %d ms",
-		            max_distance_rad, timeout_ms);
+        RCLCPP_INFO(this->get_logger(), "Moving %.3f rad max, timeout: %d ms",
+                    max_distance_rad, timeout_ms);
 
-		int  elapsed_ms   = 0;
-		bool goal_reached = false;
+        int  elapsed_ms   = 0;
+        bool goal_reached = false;
 
-		while (elapsed_ms < timeout_ms)
-		{
-		    read_current_positions();
+        while (elapsed_ms < timeout_ms && !motion_cancelled_.load())
+        {
+            read_current_positions();
 
-		    goal_reached = true;
-		    for (size_t i = 0; i < num_servos_; i++)
-		    {
-		        if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
-		        {
-		            goal_reached = false;
-		            break;
-		        }
-		    }
+            goal_reached = true;
+            for (size_t i = 0; i < num_servos_; i++)
+            {
+                if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
+                {
+                    goal_reached = false;
+                    break;
+                }
+            }
 
-		    if (goal_reached) break;
+            if (goal_reached) break;
 
-		    std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
-		    elapsed_ms += polling_ms;
-		}
+            std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
+            elapsed_ms += polling_ms;
+        }
 
-		message = goal_reached ? "Goal reached" : "Timeout: goal not reached";
-		return goal_reached;
-	}
+        if (motion_cancelled_.load())
+            message = "Motion cancelled";
+        else
+            message = goal_reached ? "Goal reached" : "Timeout: goal not reached";
+
+        return goal_reached;
+    }
+
+    // =========================
+    // TOPIC CALLBACK (goal_pose)
+    // =========================
+    void goal_pose_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    {
+        if (motion_active_.load())
+        {
+            RCLCPP_WARN(this->get_logger(), "New goal_pose received while moving. Cancelling current motion.");
+            motion_cancelled_.store(true);
+            if (motion_future_.valid())
+                motion_future_.wait();
+        }
+
+        std::vector<double> positions = msg->data;
+
+        motion_cancelled_.store(false);
+        motion_active_.store(true);
+
+        motion_future_ = std::async(std::launch::async, [this, positions]()
+        {
+            std::string result_msg;
+            bool reached = move_to_position(positions, result_msg);
+
+            RCLCPP_INFO(this->get_logger(), "goal_pose result: %s", result_msg.c_str());
+
+            std_msgs::msg::Bool out;
+            out.data = reached;
+            pub_goal_reached_->publish(out);
+
+            motion_active_.store(false);
+        });
+    }
 
     // =========================
     // SERVICE
     // =========================
     void move_service(
-		const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
-		std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
-	{
-		response->success = move_to_position(request->positions, response->message);
-	}
+        const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
+        std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
+    {
+        response->success = move_to_position(request->positions, response->message);
+    }
 
     // =========================
     // TIMER
