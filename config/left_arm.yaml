@@ -8,6 +8,8 @@
 
     joint_states_topic: "left_arm/joint_states"
     current_pose_topic: "left_arm/current_pose"
+    goal_pose_topic: "left_arm/goal_pose"
+    goal_reached_topic: "left_arm/goal_reached"
     arm_controller_service: "move_left_arm"
 
     servo_ids: [0, 2, 4, 5, 6, 7]
