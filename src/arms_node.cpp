@@ -47,7 +47,7 @@ public:
             starting_position = {0.0, 0.0, 0.3, 1.2, 0.0, 1.2};
 
         if (service_name_.find("right") != std::string::npos)
-            starting_position = {0.0, 0.0, -0.3, 1.2, 0.0, 1.2};
+            starting_position = {0.0, 0.0, -0.3, 1.5, 0.0, 1.2};
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
