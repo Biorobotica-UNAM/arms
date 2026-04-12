@@ -41,7 +41,7 @@ public:
         setup_interfaces();
         initialize_messages();
 
-        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.2, 0.0, 0.0};
 
         if (service_name_.find("left") != std::string::npos)
             starting_position = {0.0, 0.0, 0.3, 1.2, 0.0, 1.2};
