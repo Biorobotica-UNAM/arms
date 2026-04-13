@@ -3,8 +3,9 @@
 #include <future>
 #include <memory>
 #include <chrono>
+#include <cmath>
+#include <mutex>
 #include <thread>
-
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
@@ -21,12 +22,10 @@ using namespace std::chrono_literals;
 #define MX_MOVING_SPEED     32
 #define MX_TORQUE_ENABLE    24
 #define MX_TORQUE_LIMIT     34
-
 #define TORQUE_LIMIT_BITS 1000
 
 class ArmsNode : public rclcpp::Node {
 public:
-
     ArmsNode() : Node("arms_node")
     {
         RCLCPP_INFO(this->get_logger(), "Initializing arms_node...");
@@ -41,7 +40,7 @@ public:
         setup_interfaces();
         initialize_messages();
 
-        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.5, 0.0, 0.0};
+        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
 
         if (service_name_.find("left") != std::string::npos)
             starting_position = {0.0, 0.0, 0.3, 1.5, 0.0, 1.2};
@@ -74,24 +73,31 @@ public:
     }
 
 private:
-
+    // =========================
     // ROS
+    // =========================
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr pub_joint_state_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr pub_current_pose_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_goal_reached_;
     rclcpp::Service<arms_interfaces::srv::MoveArms>::SharedPtr srv_move_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr sub_goal_pose_;
+    rclcpp::CallbackGroup::SharedPtr service_cb_group_;
 
-    // Dynamixel
-    dynamixel::PortHandler* port_handler_ = nullptr;
+    // =========================
+    // DYNAMIXEL
+    // =========================
+    dynamixel::PortHandler* port_handler_   = nullptr;
     dynamixel::PacketHandler* packet_handler_ = nullptr;
+    std::mutex hardware_mutex_;
 
-    // Parameters
+    // =========================
+    // PARAMETERS
+    // =========================
     std::string port_name_;
-    int baudrate_;
+    int  baudrate_;
     bool torque_enable_;
-    int max_speed_;
+    int  max_speed_;
     std::string joint_states_topic_;
     std::string current_pose_topic_;
     std::string service_name_;
@@ -99,37 +105,41 @@ private:
     std::string goal_reached_topic_;
     bool simulation_;
 
-    std::vector<int> servo_ids_;
+    std::vector<int>    servo_ids_;
     std::vector<double> servo_bits_per_radian_;
-    std::vector<int> servo_zeros_;
-    std::vector<int> servo_directions_;
-    std::vector<int> servo_min_limits_;
-    std::vector<int> servo_max_limits_;
+    std::vector<int>    servo_zeros_;
+    std::vector<int>    servo_directions_;
+    std::vector<int>    servo_min_limits_;
+    std::vector<int>    servo_max_limits_;
 
     size_t num_servos_;
     std::vector<std::string> joint_names_;
 
-    // State
+    // =========================
+    // STATE
+    // =========================
     std::vector<int> current_position_bits_;
     std::vector<int> goal_pose_bits_;
 
-    // Messages
-    sensor_msgs::msg::JointState joint_states_;
-    std_msgs::msg::Float64MultiArray msg_current_pose_;
-
-    bool motors_available_ = false;
-    uint8_t dxl_error = 0;
+    bool  motors_available_ = false;
+    uint8_t dxl_error_        = 0;
 
     rclcpp::Time last_config_attempt_{0, 0, RCL_ROS_TIME};
 
-    // Motion concurrency control
+    std::atomic<bool> motion_in_progress_{false};
     std::atomic<bool> motion_active_{false};
     std::atomic<bool> motion_cancelled_{false};
     std::future<void> motion_future_;
 
     // =========================
-    // PARAMETERS
+    // MESSAGES
     // =========================
+    sensor_msgs::msg::JointState     joint_states_;
+    std_msgs::msg::Float64MultiArray msg_current_pose_;
+
+    // ======================================================
+    // PARAMETERS
+    // ======================================================
     bool declare_and_get_parameters()
     {
         this->declare_parameter<bool>("simulation", false);
@@ -144,13 +154,14 @@ private:
         this->declare_parameter<std::string>("goal_pose_topic", "goal_pose");
         this->declare_parameter<std::string>("goal_reached_topic", "goal_reached");
 
-        this->declare_parameter<std::vector<int64_t>>("servo_ids", std::vector<int64_t>{});
-        this->declare_parameter<std::vector<double>>("servo_bits_per_radian", std::vector<double>{});
-        this->declare_parameter<std::vector<int64_t>>("servo_zeros", std::vector<int64_t>{});
-        this->declare_parameter<std::vector<int64_t>>("servo_directions", std::vector<int64_t>{});
-        this->declare_parameter<std::vector<int64_t>>("servo_min_limits", std::vector<int64_t>{});
-        this->declare_parameter<std::vector<int64_t>>("servo_max_limits", std::vector<int64_t>{});
-        this->declare_parameter<std::vector<std::string>>("joint_names", std::vector<std::string>{});
+        // Corregido: Se usa std::vector<T>() explícito para evitar warnings de conversión
+        this->declare_parameter<std::vector<int64_t>>("servo_ids", std::vector<int64_t>());
+        this->declare_parameter<std::vector<double>> ("servo_bits_per_radian", std::vector<double>());
+        this->declare_parameter<std::vector<int64_t>>("servo_zeros", std::vector<int64_t>());
+        this->declare_parameter<std::vector<int64_t>>("servo_directions", std::vector<int64_t>());
+        this->declare_parameter<std::vector<int64_t>>("servo_min_limits", std::vector<int64_t>());
+        this->declare_parameter<std::vector<int64_t>>("servo_max_limits", std::vector<int64_t>());
+        this->declare_parameter<std::vector<std::string>>("joint_names", std::vector<std::string>());
 
         simulation_    = this->get_parameter("simulation").as_bool();
         port_name_     = this->get_parameter("port").as_string();
@@ -190,9 +201,9 @@ private:
         return true;
     }
 
-    // =========================
-    // INIT
-    // =========================
+    // ======================================================
+    // INIT HARDWARE
+    // ======================================================
     bool initialize_dynamixel()
     {
         if (simulation_)
@@ -212,7 +223,7 @@ private:
         port_handler_   = dynamixel::PortHandler::getPortHandler(port_name_.c_str());
         packet_handler_ = dynamixel::PacketHandler::getPacketHandler(1.0);
 
-        if (!port_handler_->openPort())        return false;
+        if (!port_handler_->openPort())             return false;
         if (!port_handler_->setBaudRate(baudrate_)) return false;
 
         current_position_bits_.resize(num_servos_, 0);
@@ -220,8 +231,9 @@ private:
 
         if (read_current_positions())
         {
-            goal_pose_bits_ = current_position_bits_;
+            goal_pose_bits_   = current_position_bits_;
             configure_servos();
+            motors_available_ = true;
         }
         else
         {
@@ -231,32 +243,62 @@ private:
         return true;
     }
 
-    // =========================
+    // ======================================================
     // ROS INTERFACES
-    // =========================
+    // ======================================================
     void setup_interfaces()
     {
+        service_cb_group_ = this->create_callback_group(
+            rclcpp::CallbackGroupType::MutuallyExclusive);
+
         pub_joint_state_  = this->create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
         pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(current_pose_topic_, 10);
         pub_goal_reached_ = this->create_publisher<std_msgs::msg::Bool>(goal_reached_topic_, 10);
 
         srv_move_ = this->create_service<arms_interfaces::srv::MoveArms>(
-            service_name_, std::bind(&ArmsNode::move_service, this, _1, _2));
+            service_name_,
+            std::bind(&ArmsNode::move_service, this, _1, _2),
+            rmw_qos_profile_default,
+            service_cb_group_);
+
+        rclcpp::SubscriptionOptions sub_options;
+        sub_options.callback_group = service_cb_group_;
 
         sub_goal_pose_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            goal_pose_topic_, 10,
-            std::bind(&ArmsNode::goal_pose_callback, this, _1));
+            goal_pose_topic_, 
+            10,
+            std::bind(&ArmsNode::goal_pose_callback, this, _1),
+            sub_options); 
     }
 
     void initialize_messages()
     {
         msg_current_pose_.data.resize(num_servos_);
-        joint_states_.name = joint_names_;
+        joint_states_.name     = joint_names_;
+        joint_states_.position.resize(num_servos_, 0.0);
+        joint_states_.velocity.resize(num_servos_, 0.0);
+        joint_states_.effort.resize(num_servos_,   0.0);
     }
 
-    // =========================
+    // ======================================================
+    // PUBLISH
+    // ======================================================
+    void publish()
+    {
+        joint_states_.header.stamp = this->now();
+        joint_states_.position     = bits_to_radians(current_position_bits_);
+
+        pub_joint_state_->publish(joint_states_);
+
+        for (size_t i = 0; i < num_servos_; i++)
+            msg_current_pose_.data[i] = joint_states_.position[i];
+
+        pub_current_pose_->publish(msg_current_pose_);
+    }
+
+    // ======================================================
     // MOVEMENT CONTROL
-    // =========================
+    // ======================================================
     bool move_to_position(const std::vector<double>& positions, std::string& message)
     {
         if (positions.size() != num_servos_)
@@ -270,25 +312,27 @@ private:
             for (size_t i = 0; i < num_servos_; i++)
             {
                 goal_pose_bits_[i] = static_cast<int>(
-                    servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]
-                );
+                    servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]);
                 current_position_bits_[i] = goal_pose_bits_[i];
             }
-
+            publish();
             message = "Goal reached (simulation)";
             return true;
         }
 
-        if (!read_current_positions())
         {
-            message = "Cannot read servo positions. Check motor power";
-            return false;
+            std::lock_guard<std::mutex> lock(hardware_mutex_);
+            if (!read_current_positions())
+            {
+                message = "Cannot read servo positions. Check motor power";
+                return false;
+            }
         }
 
         for (size_t i = 0; i < num_servos_; i++)
         {
-            int raw = servo_directions_[i] * positions[i] *
-                      servo_bits_per_radian_[i] + servo_zeros_[i];
+            int raw = static_cast<int>(
+                servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]);
 
             if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i])
             {
@@ -310,17 +354,14 @@ private:
             goal_pose_bits_[i] = raw;
         }
 
-        write_goal_positions();
+        {
+            std::lock_guard<std::mutex> lock(hardware_mutex_);
+            write_goal_positions();
+        }
 
         const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
         const int    tolerance_bits        = 20;
-        const int    polling_ms            = 20;
-
-        if (!read_current_positions())
-        {
-            message = "Cannot read servo positions. Check motor power";
-            return false;
-        }
+        const int    polling_ms            = 50;
 
         int max_distance_bits = 0;
         for (size_t i = 0; i < num_servos_; i++)
@@ -342,24 +383,29 @@ private:
         bool goal_reached = false;
 
         while (elapsed_ms < timeout_ms && !motion_cancelled_.load())
-        {
-            read_current_positions();
+		{
+			{
+				std::lock_guard<std::mutex> lock(hardware_mutex_);
+				read_current_positions();
+			}
 
-            goal_reached = true;
-            for (size_t i = 0; i < num_servos_; i++)
-            {
-                if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
-                {
-                    goal_reached = false;
-                    break;
-                }
-            }
+			publish(); 
 
-            if (goal_reached) break;
+			goal_reached = true;
+			for (size_t i = 0; i < num_servos_; i++)
+			{
+				if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits)
+				{
+				    goal_reached = false;
+				    break;
+				}
+			}
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
-            elapsed_ms += polling_ms;
-        }
+			if (goal_reached) break;
+
+			std::this_thread::sleep_for(std::chrono::milliseconds(polling_ms));
+			elapsed_ms += polling_ms;
+		}
 
         if (motion_cancelled_.load())
             message = "Motion cancelled";
@@ -369,76 +415,74 @@ private:
         return goal_reached;
     }
 
-    // =========================
+    // ======================================================
     // TOPIC CALLBACK (goal_pose)
-    // =========================
+    // ======================================================
     void goal_pose_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
-    {
-        if (motion_active_.load())
-        {
-            RCLCPP_WARN(this->get_logger(), "New goal_pose received while moving. Cancelling current motion.");
-            motion_cancelled_.store(true);
-            if (motion_future_.valid())
-                motion_future_.wait();
-        }
+	{
+		if (msg->data.empty()) return;
 
-        std::vector<double> positions = msg->data;
+		motion_cancelled_.store(true);
+		
+		std::vector<double> positions = msg->data;
 
-        motion_cancelled_.store(false);
-        motion_active_.store(true);
+		motion_cancelled_.store(false);
+		motion_active_.store(true);
+		motion_in_progress_.store(true);
 
-        motion_future_ = std::async(std::launch::async, [this, positions]()
-        {
-            std::string result_msg;
-            bool reached = move_to_position(positions, result_msg);
+		motion_future_ = std::async(std::launch::async, [this, positions]()
+		{
+		    std::string result_msg;
+		    bool reached = move_to_position(positions, result_msg);
+		    
+		    std_msgs::msg::Bool out;
+		    out.data = reached;
+		    pub_goal_reached_->publish(out);
 
-            RCLCPP_INFO(this->get_logger(), "goal_pose result: %s", result_msg.c_str());
+		    motion_in_progress_.store(false);
+		    motion_active_.store(false);
+		});
+	}
 
-            std_msgs::msg::Bool out;
-            out.data = reached;
-            pub_goal_reached_->publish(out);
-
-            motion_active_.store(false);
-        });
-    }
-
-    // =========================
+    // ======================================================
     // SERVICE
-    // =========================
+    // ======================================================
     void move_service(
         const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
         std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
     {
+        motion_cancelled_.store(false);
+        motion_active_.store(true);
+        motion_in_progress_.store(true);
+
         response->success = move_to_position(request->positions, response->message);
+
+        motion_in_progress_.store(false);
+        motion_active_.store(false);
     }
 
-    // =========================
+    // ======================================================
     // TIMER
-    // =========================
+    // ======================================================
     void timer_callback()
     {
-        read_current_positions();
+        if (!motion_in_progress_.load())
+        {
+            std::lock_guard<std::mutex> lock(hardware_mutex_);
+            read_current_positions();
+        }
 
-        joint_states_.header.stamp = this->now();
-        joint_states_.position = bits_to_radians(current_position_bits_);
-
-        pub_joint_state_->publish(joint_states_);
-
-        for(size_t i = 0; i < num_servos_; i++)
-            msg_current_pose_.data[i] = joint_states_.position[i];
-
-        pub_current_pose_->publish(msg_current_pose_);
+        publish();
     }
 
-    // =========================
+    // ======================================================
     // HARDWARE
-    // =========================
+    // ======================================================
     bool configure_servos()
     {
         for (size_t i = 0; i < num_servos_; i++)
         {
             int result;
-
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
             packet_handler_->write2ByteTxOnly(
@@ -447,7 +491,7 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
             result = packet_handler_->write1ByteTxRx(
-                port_handler_, servo_ids_[i], MX_TORQUE_ENABLE, torque_enable_, &dxl_error);
+                port_handler_, servo_ids_[i], MX_TORQUE_ENABLE, torque_enable_, &dxl_error_);
 
             if (result != COMM_SUCCESS)
             {
@@ -460,7 +504,7 @@ private:
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
             result = packet_handler_->write2ByteTxRx(
-                port_handler_, servo_ids_[i], MX_TORQUE_LIMIT, TORQUE_LIMIT_BITS, &dxl_error);
+                port_handler_, servo_ids_[i], MX_TORQUE_LIMIT, TORQUE_LIMIT_BITS, &dxl_error_);
 
             if (result != COMM_SUCCESS)
             {
@@ -486,7 +530,7 @@ private:
                 servo_ids_[i],
                 MX_PRESENT_POSITION,
                 &raw,
-                &dxl_error);
+                &dxl_error_);
 
             if (result != COMM_SUCCESS)
             {
@@ -521,36 +565,39 @@ private:
             else
             {
                 RCLCPP_WARN(this->get_logger(), "Configuration failed, retrying");
+                return false;
             }
         }
 
         return true;
     }
 
-    bool write_goal_positions()
+    void write_goal_positions()
     {
-        if(simulation_)
+        if (simulation_)
         {
             current_position_bits_ = goal_pose_bits_;
-            return true;
+            return;
         }
 
-        for(size_t i = 0; i < num_servos_; i++)
+        for (size_t i = 0; i < num_servos_; i++)
         {
             packet_handler_->write2ByteTxRx(
                 port_handler_,
                 servo_ids_[i],
                 MX_GOAL_POSITION,
                 goal_pose_bits_[i],
-                &dxl_error);
+                &dxl_error_);
         }
-        return true;
     }
 
+    // ======================================================
+    // HELPERS
+    // ======================================================
     std::vector<double> bits_to_radians(const std::vector<int>& bits)
     {
         std::vector<double> radians(bits.size());
-        for(size_t i = 0; i < bits.size(); i++)
+        for (size_t i = 0; i < bits.size(); i++)
         {
             radians[i] = servo_directions_[i] *
                          (bits[i] - servo_zeros_[i]) /
@@ -560,10 +607,16 @@ private:
     }
 };
 
+// ======================================================
+// MAIN
+// ======================================================
 int main(int argc, char** argv)
 {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<ArmsNode>());
+    auto node = std::make_shared<ArmsNode>();
+    rclcpp::executors::MultiThreadedExecutor executor;
+    executor.add_node(node);
+    executor.spin();
     rclcpp::shutdown();
     return 0;
 }
