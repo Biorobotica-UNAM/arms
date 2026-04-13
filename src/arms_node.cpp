@@ -58,7 +58,7 @@ public:
             RCLCPP_WARN(this->get_logger(), "Failed to reach starting position: %s", msg.c_str());
 
         timer_ = this->create_wall_timer(
-            80ms, std::bind(&ArmsNode::timer_callback, this));
+            100ms, std::bind(&ArmsNode::timer_callback, this));
 
         RCLCPP_INFO(this->get_logger(), "Arms node ready");
     }
@@ -365,7 +365,7 @@ private:
 
 		const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
 		const int tolerance_bits = 20;
-		const int polling_ms = 100;
+		const int polling_ms = 50;
 
 		int max_diff = 0;
 		for (size_t i = 0; i < num_servos_; i++) {
