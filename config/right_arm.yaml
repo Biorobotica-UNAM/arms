@@ -1,22 +1,24 @@
 /**:
   ros__parameters:
-    simulation: true
+    simulation: false
     port: "/dev/rightArm"
     baudrate: 1000000
-    torque_enable: false
+    torque_enable: true
     max_speed: 20
 
     joint_states_topic: "right_arm/joint_states"
     current_pose_topic: "right_arm/current_pose"
+    goal_pose_topic: "right_arm/goal_pose"
+    goal_reached_topic: "right_arm/goal_reached"
     arm_controller_service: "move_right_arm"
 
     servo_ids: [0, 2, 4, 5, 6, 7]
     servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
     servo_zeros: [1950, 2040, 2100, 2170, 2050, 2035]
 
-    servo_min_limits: [830, 1020, 0, 920, 0, 1015]
-    servo_max_limits: [2990, 3085, 4095, 3200, 4095, 3050]
-    servo_directions: [1, 1, 1, 1, 1, 1]
+    servo_min_limits: [830, 1020, 1076, 920, 1026, 1015]
+    servo_max_limits: [2990, 3085, 3124, 3200, 3074, 3050]
+    servo_directions: [-1, 1, 1, -1, 1, -1]
 
     joint_names:
       ["rf_shoulder_joint", "rs_shoulder_joint", "r_arm_twist_joint",
