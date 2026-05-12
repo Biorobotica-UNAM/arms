@@ -52,7 +52,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
         std::string msg;
-        if (move_to_position(starting_position, msg))
+        if (move_to_position(starting_position, 0, msg))
             RCLCPP_INFO(this->get_logger(), "Starting position reached");
         else
             RCLCPP_WARN(this->get_logger(), "Failed to reach starting position: %s", msg.c_str());
@@ -317,7 +317,7 @@ private:
     // ======================================================
     // MOVEMENT CONTROL
     // ======================================================
-    bool move_to_position(const std::vector<double>& positions, std::string& message)
+    bool move_to_position(const std::vector<double>& positions, int speed, std::string& message)
 	{
 		if (positions.size() != num_servos_) {
 		    message = "Invalid joint size";
@@ -358,9 +358,10 @@ private:
 		        message = "Hardware lost before writing goal";
 		        return false;
 		    }
-
-		    goal_pose_bits_ = target_bits;
-		    write_goal_positions(); 
+		    
+			int effective_speed = (speed > 0) ? speed : max_speed_;
+			goal_pose_bits_ = target_bits;
+			write_goal_positions(effective_speed);
 		}
 
 		const double max_speed_rad_per_sec = (2.28 * 2.0 * M_PI / 60.0) / 1.1;
@@ -432,7 +433,7 @@ private:
 		motion_future_ = std::async(std::launch::async, [this, positions]()
 		{
 		    std::string result_msg;
-		    bool reached = move_to_position(positions, result_msg);
+		    bool reached = move_to_position(positions, 0, result_msg);
 		    
 		    std_msgs::msg::Bool out;
 		    out.data = reached;
@@ -454,7 +455,7 @@ private:
         motion_active_.store(true);
         motion_in_progress_.store(true);
 
-        response->success = move_to_position(request->positions, response->message);
+        response->success = move_to_position(request->positions, request->speed, response->message);
 
         motion_in_progress_.store(false);
         motion_active_.store(false);
@@ -549,11 +550,12 @@ private:
         return true;
     }
 
-    void write_goal_positions()
+    void write_goal_positions(int speed)
     {
         if (simulation_) return;
         for (size_t i = 0; i < num_servos_; i++)
         {
+			packet_handler_->write2ByteTxRx(port_handler_, servo_ids_[i], MX_MOVING_SPEED, speed, &dxl_error_);
             packet_handler_->write2ByteTxRx(port_handler_, servo_ids_[i], MX_GOAL_POSITION, goal_pose_bits_[i], &dxl_error_);
         }
     }
