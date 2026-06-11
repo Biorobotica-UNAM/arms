@@ -18,7 +18,7 @@
 
     servo_min_limits: [1016, 1026, 1036, 1113, 1426, 1055]
     servo_max_limits: [3064, 3074, 3084, 3161, 3474, 3100]
-    servo_directions: [-1, 1, 1, -1, -1, -1]
+    servo_directions: [-1, -1, 1, -1, 1, -1]
 
     joint_names:
       ["lf_shoulder_joint", "ls_shoulder_joint", "l_arm_twist_joint",
