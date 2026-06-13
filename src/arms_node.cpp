@@ -106,6 +106,9 @@ private:
     std::string goal_reached_topic_;
     bool simulation_;
 
+	bool compensation_enable_;
+	std::vector<int> compensation_bits_;
+
     std::vector<int>    servo_ids_;
     std::vector<double> servo_bits_per_radian_;
     std::vector<int>    servo_zeros_;
@@ -162,6 +165,8 @@ private:
         this->declare_parameter<std::vector<int64_t>>("servo_min_limits", std::vector<int64_t>());
         this->declare_parameter<std::vector<int64_t>>("servo_max_limits", std::vector<int64_t>());
         this->declare_parameter<std::vector<std::string>>("joint_names", std::vector<std::string>());
+		this->declare_parameter<bool>("compensation_enable", true);
+		this->declare_parameter<std::vector<int64_t>>("compensation_bits", std::vector<int64_t>(6,0));
 
         simulation_    = this->get_parameter("simulation").as_bool();
         port_name_     = this->get_parameter("port").as_string();
@@ -183,6 +188,12 @@ private:
 
         joint_names_           = this->get_parameter("joint_names").as_string_array();
         servo_bits_per_radian_ = this->get_parameter("servo_bits_per_radian").as_double_array();
+
+		compensation_enable_ = this->get_parameter("compensation_enable").as_bool();
+		auto compensation =    this->get_parameter("compensation_bits").as_integer_array();
+
+for(auto v: compensation)
+    compensation_bits_.push_back((int)v);
 
         num_servos_ = ids.size();
 
@@ -343,7 +354,9 @@ private:
 		std::vector<int> target_bits(num_servos_);
 		for (size_t i = 0; i < num_servos_; i++) {
 		    int raw = static_cast<int>(
-		        servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]);
+				servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]);
+
+			raw += servo_directions_[i] * get_compensation_bits(i, positions[i]);
 
 		    if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i]) {
 		        message = "Joint " + joint_names_[i] + " out of range.";
@@ -561,14 +574,53 @@ private:
     }
 
     std::vector<double> bits_to_radians(const std::vector<int>& bits)
-    {
-        std::vector<double> radians(bits.size());
-        for (size_t i = 0; i < bits.size(); i++)
-        {
-            radians[i] = servo_directions_[i] * (bits[i] - servo_zeros_[i]) / servo_bits_per_radian_[i];
-        }
-        return radians;
-    }
+	{
+		std::vector<double> radians(bits.size());
+
+		for(size_t i=0;i<bits.size();i++)
+		{
+		    double measured_angle =
+				servo_directions_[i] *
+				(bits[i]-servo_zeros_[i]) /
+				servo_bits_per_radian_[i];
+
+			int correction =
+				servo_directions_[i] *
+				get_compensation_bits(i, measured_angle);
+
+			double logical_angle =
+				servo_directions_[i] *
+				(bits[i]-correction-servo_zeros_[i]) /
+				servo_bits_per_radian_[i];
+			radians[i] = logical_angle;
+		}
+
+		return radians;
+	}
+
+	int get_compensation_bits(size_t joint, double angle_rad)
+	{
+		if(!compensation_enable_)
+		    return 0;
+
+		if(joint>=compensation_bits_.size())
+		    return 0;
+
+		double factor =
+		    std::min(
+		        std::abs(angle_rad)/(M_PI/2.0),
+		        1.0);
+
+		int bits =
+		    (int)std::round(
+		        factor*
+		        compensation_bits_[joint]);
+
+		if(angle_rad<0)
+		    bits=-bits;
+
+		return bits;
+	}
 };
 
 // ======================================================
