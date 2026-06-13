@@ -352,17 +352,31 @@ for(auto v: compensation)
 		}
 
 		std::vector<int> target_bits(num_servos_);
-		for (size_t i = 0; i < num_servos_; i++) {
-		    int raw = static_cast<int>(
-				servo_directions_[i] * positions[i] * servo_bits_per_radian_[i] + servo_zeros_[i]);
+		for (size_t i = 0; i < num_servos_; i++)
+		{
+			int raw = static_cast<int>(
+				servo_directions_[i] * positions[i] *
+				servo_bits_per_radian_[i] +
+				servo_zeros_[i]);
 
-			raw += servo_directions_[i] * get_compensation_bits(i, positions[i]);
+			if (raw < servo_min_limits_[i] ||
+				raw > servo_max_limits_[i])
+			{
+				message = "Joint " + joint_names_[i] + " out of range.";
+				return false;
+			}
 
-		    if (raw < servo_min_limits_[i] || raw > servo_max_limits_[i]) {
-		        message = "Joint " + joint_names_[i] + " out of range.";
-		        return false;
-		    }
-		    target_bits[i] = raw;
+			int compensated =
+				raw +
+				servo_directions_[i] *
+				get_compensation_bits(i, positions[i]);
+
+			compensated = std::clamp(
+				compensated,
+				servo_min_limits_[i],
+				servo_max_limits_[i]);
+
+			target_bits[i] = compensated;
 		}
 
 		{
