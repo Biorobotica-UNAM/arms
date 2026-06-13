@@ -41,13 +41,13 @@ public:
         setup_interfaces();
         initialize_messages();
 
-        std::vector<double> starting_position = {0.0, 0.0, 0.0, 1.0, 0.0, 0.0};
+        std::vector<double> starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 1.57};
 
         if (service_name_.find("left") != std::string::npos)
-            starting_position = {0.0, 0.0, 0.3, 1.5, 0.0, 1.2};
+            starting_position = {0.0, 0.0, 0.3, 0.0, 0.0, 1.57};
 
         if (service_name_.find("right") != std::string::npos)
-            starting_position = {0.0, 0.0, -0.3, 1.5, 0.0, 1.2};
+            starting_position = {0.0, 0.0, -0.3, 0.0, 0.0, 1.57};
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
@@ -57,7 +57,7 @@ public:
         else
             RCLCPP_WARN(this->get_logger(), "Failed to reach starting position: %s", msg.c_str());
 
-        timer_ = this->create_wall_timer(
+        timer_ = this->create_wall_timer(	
             100ms, std::bind(&ArmsNode::timer_callback, this));
 
         RCLCPP_INFO(this->get_logger(), "Arms node ready");
