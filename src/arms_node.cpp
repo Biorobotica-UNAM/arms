@@ -44,10 +44,10 @@ public:
         std::vector<double> starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 1.57};
 
         if (service_name_.find("left") != std::string::npos)
-            starting_position = {0.0, 0.0, 0.3, 0.0, 0.0, 1.57};
+            starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
         if (service_name_.find("right") != std::string::npos)
-            starting_position = {0.0, 0.0, -0.3, 0.0, 0.0, 1.57};
+            starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
