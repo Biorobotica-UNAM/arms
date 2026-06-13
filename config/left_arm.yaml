@@ -16,12 +16,12 @@
     servo_bits_per_radian: [651.7395, 651.7395, 651.7395, 651.7395, 651.7395, 651.7395]
     servo_zeros: [2040, 2050, 2060, 2137, 2450, 2080]
 
-    servo_min_limits: [916, 926, 936, 1013, 1326, 956]
-    servo_max_limits: [3164, 3174, 3184, 3261, 3574, 3204]
+    servo_min_limits: [916, 926, 1036, 1063, 1426, 1056]
+    servo_max_limits: [3164, 3174, 3084, 3211, 3474, 3104]
     servo_directions: [-1, -1, 1, -1, 1, -1]
 
     compensation_enable: true
-    compensation_bits: [0, 100, 0, 100, 0, 0]
+    compensation_bits: [100, 100, 0, 50, 0, 0]
 
     joint_names:
       ["lf_shoulder_joint", "ls_shoulder_joint", "l_arm_twist_joint",
