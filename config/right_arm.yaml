@@ -21,7 +21,7 @@
     servo_directions: [-1, -1, 1, -1, 1, -1]
 
     compensation_enable: true
-    compensation_bits: [100, 100, 0, 50, 0, 0]
+    compensation_bits: [100, 100, 0, 50, 0, 25]
 
     joint_names:
       ["rf_shoulder_joint", "rs_shoulder_joint", "r_arm_twist_joint",
