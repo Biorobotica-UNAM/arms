@@ -133,7 +133,10 @@ private:
     std::atomic<bool> motion_in_progress_{false};
     std::atomic<bool> motion_active_{false};
     std::atomic<bool> motion_cancelled_{false};
+	std::atomic<bool> stopped_{false};
     std::future<void> motion_future_;
+
+	rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_stop_;
 
     // =========================
     // MESSAGES
@@ -297,7 +300,12 @@ for(auto v: compensation)
         sub_goal_pose_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
             goal_pose_topic_, 10,
             std::bind(&ArmsNode::goal_pose_callback, this, _1),
-            sub_options); 
+            sub_options);
+
+		sub_stop_ = this->create_subscription<std_msgs::msg::Bool>(
+    		"/navigation/navigation_ctrl/stop",
+    		rclcpp::QoS(1).reliable(),
+    		std::bind(&ArmsNode::stop_callback, this, _1));
     }
 
     void initialize_messages()
@@ -330,6 +338,11 @@ for(auto v: compensation)
     // ======================================================
     bool move_to_position(const std::vector<double>& positions, int speed, std::string& message)
 	{
+		if (stopped_.load()) {
+		    message = "Brazos detenidos por señal de paro";
+		    return false;
+		}
+
 		if (positions.size() != num_servos_) {
 		    message = "Invalid joint size";
 		    return false;
@@ -442,11 +455,37 @@ for(auto v: compensation)
 
 
     // ======================================================
+    // TOPIC CALLBACK (stop)
+    // ======================================================
+	void stop_callback(const std_msgs::msg::Bool::SharedPtr msg)
+	{
+		bool stop = msg->data;
+
+		if (stop && !stopped_.load())
+		{
+		    RCLCPP_WARN(this->get_logger(), "STOP recibido — cancelando movimiento y bloqueando brazos");
+		    stopped_.store(true);
+		    motion_cancelled_.store(true);
+		}
+		else if (!stop && stopped_.load())
+		{
+		    RCLCPP_INFO(this->get_logger(), "STOP desactivado — brazos disponibles nuevamente");
+		    stopped_.store(false);
+		    motion_cancelled_.store(false);
+		}
+	}
+
+    // ======================================================
     // TOPIC CALLBACK (goal_pose)
     // ======================================================
     void goal_pose_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
 	{
 		if (msg->data.empty()) return;
+
+		if (stopped_.load()) {
+		    RCLCPP_WARN(this->get_logger(), "goal_pose ignorado: brazos en paro");
+		    return;
+		}
 
 		motion_cancelled_.store(true);
 		if (motion_future_.valid()) motion_future_.wait();
@@ -478,6 +517,12 @@ for(auto v: compensation)
         const std::shared_ptr<arms_interfaces::srv::MoveArms::Request> request,
         std::shared_ptr<arms_interfaces::srv::MoveArms::Response> response)
     {
+		if (stopped_.load()) {
+		    response->success = false;
+		    response->message = "Brazos detenidos por señal de paro";
+		    return;
+		}
+
         motion_cancelled_.store(false);
         motion_active_.store(true);
         motion_in_progress_.store(true);
