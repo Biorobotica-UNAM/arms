@@ -466,6 +466,13 @@ for(auto v: compensation)
 		    RCLCPP_WARN(this->get_logger(), "STOP recibido — cancelando movimiento y bloqueando brazos");
 		    stopped_.store(true);
 		    motion_cancelled_.store(true);
+
+		    if (!simulation_ && motors_available_.load())
+		    {
+		        std::lock_guard<std::mutex> lock(hardware_mutex_);
+		        goal_pose_bits_ = current_position_bits_;
+		        write_goal_positions(max_speed_);
+		    }
 		}
 		else if (!stop && stopped_.load())
 		{
