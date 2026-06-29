@@ -446,9 +446,14 @@ for(auto v: compensation)
 		}
 
 		if (motion_cancelled_.load())
-		    message = "Motion cancelled";
+		{
+			std::lock_guard<std::mutex> lock(hardware_mutex_);
+			goal_pose_bits_ = current_position_bits_;
+			write_goal_positions(max_speed_);
+			message = "Motion cancelled";
+		}
 		else
-		    message = goal_reached ? "Goal reached" : "Timeout";
+			message = goal_reached ? "Goal reached" : "Timeout";
 
 		return goal_reached;
 	}
@@ -547,12 +552,6 @@ for(auto v: compensation)
 		        motors_available_.store(false);
 		        return;
 		    }
-
-			if (stopped_.load()) {
-		        goal_pose_bits_ = current_position_bits_;
-		        write_goal_positions(max_speed_);
-		    }
-
 		    publish();
 		} 
 		else {
