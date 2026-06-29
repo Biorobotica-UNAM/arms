@@ -463,20 +463,13 @@ for(auto v: compensation)
 
 		if (stop && !stopped_.load())
 		{
-		    RCLCPP_WARN(this->get_logger(), "STOP recibido — cancelando movimiento y bloqueando brazos");
-		    stopped_.store(true);
+		    RCLCPP_WARN(this->get_logger(), "STOP recibido — bloqueando brazos");
 		    motion_cancelled_.store(true);
-
-		    if (!simulation_ && motors_available_.load())
-		    {
-		        std::lock_guard<std::mutex> lock(hardware_mutex_);
-		        goal_pose_bits_ = current_position_bits_;
-		        write_goal_positions(max_speed_);
-		    }
+		    stopped_.store(true);
 		}
 		else if (!stop && stopped_.load())
 		{
-		    RCLCPP_INFO(this->get_logger(), "STOP desactivado — brazos disponibles nuevamente");
+		    RCLCPP_INFO(this->get_logger(), "STOP desactivado — brazos disponibles");
 		    stopped_.store(false);
 		    motion_cancelled_.store(false);
 		}
@@ -554,6 +547,12 @@ for(auto v: compensation)
 		        motors_available_.store(false);
 		        return;
 		    }
+
+			if (stopped_.load()) {
+		        goal_pose_bits_ = current_position_bits_;
+		        write_goal_positions(max_speed_);
+		    }
+
 		    publish();
 		} 
 		else {
