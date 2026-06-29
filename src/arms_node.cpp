@@ -84,6 +84,7 @@ private:
     rclcpp::Service<arms_interfaces::srv::MoveArms>::SharedPtr srv_move_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr sub_goal_pose_;
     rclcpp::CallbackGroup::SharedPtr service_cb_group_;
+	rclcpp::CallbackGroup::SharedPtr stop_cb_group_;
 
     // =========================
     // DYNAMIXEL
@@ -283,6 +284,8 @@ for(auto v: compensation)
     {
         service_cb_group_ = this->create_callback_group(
             rclcpp::CallbackGroupType::MutuallyExclusive);
+		stop_cb_group_ = this->create_callback_group(
+			rclcpp::CallbackGroupType::MutuallyExclusive);
 
         pub_joint_state_  = this->create_publisher<sensor_msgs::msg::JointState>(joint_states_topic_, 10);
         pub_current_pose_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(current_pose_topic_, 10);
@@ -296,6 +299,9 @@ for(auto v: compensation)
 
         rclcpp::SubscriptionOptions sub_options;
         sub_options.callback_group = service_cb_group_;
+		
+		rclcpp::SubscriptionOptions stop_options;
+		stop_options.callback_group = stop_cb_group_;
 
         sub_goal_pose_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
             goal_pose_topic_, 10,
@@ -303,9 +309,10 @@ for(auto v: compensation)
             sub_options);
 
 		sub_stop_ = this->create_subscription<std_msgs::msg::Bool>(
-    		"/navigation/navigation_ctrl/stop",
-    		rclcpp::QoS(1).reliable(),
-    		std::bind(&ArmsNode::stop_callback, this, _1));
+			"/navigation/navigation_ctrl/stop",
+			rclcpp::QoS(1).reliable(),
+			std::bind(&ArmsNode::stop_callback, this, _1),
+			stop_options);
     }
 
     void initialize_messages()
