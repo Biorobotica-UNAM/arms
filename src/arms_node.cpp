@@ -41,13 +41,13 @@ public:
         setup_interfaces();
         initialize_messages();
 
-        std::vector<double> starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 1.57};
+        std::vector<double> starting_position = {-0.9, 0.0, 0.0, 1.5, 0.0, 0.9};
 
         if (service_name_.find("left") != std::string::npos)
-            starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            starting_position = {-0.9, 0.0, 0.0, 1.5, 0.0, 0.9};
 
         if (service_name_.find("right") != std::string::npos)
-            starting_position = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+            starting_position = {-0.9, 0.0, 0.0, 1.5, 0.0, 0.9};
 
         RCLCPP_INFO(this->get_logger(), "Moving to starting position...");
 
