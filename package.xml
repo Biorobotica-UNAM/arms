@@ -18,7 +18,7 @@
   <depend>tf2_ros</depend>
   <depend>dynamixel_sdk</depend>
   <depend>sensor_msgs</depend>
-  <depend>trayectory_msgs</depend>
+  <depend>trajectory_msgs</depend>
   <depend>arms_interfaces</depend>
 
   <test_depend>ament_lint_auto</test_depend>

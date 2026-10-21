@@ -12,6 +12,10 @@ find_package(arms_interfaces REQUIRED)
 
 add_executable(arms_node src/arms_node.cpp)
 
+target_include_directories(arms_node PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
 ament_target_dependencies(arms_node
   rclcpp
   std_msgs
@@ -24,6 +28,10 @@ ament_target_dependencies(arms_node
 
 install(TARGETS arms_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 install(DIRECTORY launch

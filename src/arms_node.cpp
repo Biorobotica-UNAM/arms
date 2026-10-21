@@ -7,9 +7,12 @@
 #include <mutex>
 #include <thread>
 
+#include "arms/arms_deflection_model.hpp"
+
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "arms_interfaces/srv/move_arms.hpp"
@@ -109,6 +112,12 @@ private:
 
 	bool compensation_enable_;
 	std::vector<int> compensation_bits_;
+
+    std::string compensation_mode_ = "legacy";
+    std::string payload_topic_     = "payload_mass";
+    double      goal_tolerance_rad_ = 0.05;
+    arms::ArmDeflectionModel deflection_model_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sub_payload_;
 
     std::vector<int>    servo_ids_;
     std::vector<double> servo_bits_per_radian_;
@@ -213,6 +222,8 @@ for(auto v: compensation)
         for(auto v : min_l) servo_min_limits_.push_back((int)v);
         for(auto v : max_l) servo_max_limits_.push_back((int)v);
 
+        load_deflection_model();
+
         return true;
     }
 
@@ -308,6 +319,14 @@ for(auto v: compensation)
             std::bind(&ArmsNode::goal_pose_callback, this, _1),
             sub_options);
 
+		if (compensation_mode_ == "gravity_model")
+		{
+			sub_payload_ = this->create_subscription<std_msgs::msg::Float64>(
+				payload_topic_, 10,
+				[this](const std_msgs::msg::Float64::SharedPtr m) { deflection_model_.setPayload(m->data); },
+				stop_options);
+		}
+
 		sub_stop_ = this->create_subscription<std_msgs::msg::Bool>(
 			"/navigation/navigation_ctrl/stop",
 			rclcpp::QoS(1).reliable(),
@@ -371,6 +390,7 @@ for(auto v: compensation)
 		    return true;
 		}
 
+		const std::vector<int> comp_bits = compensation_bits(positions);
 		std::vector<int> target_bits(num_servos_);
 		for (size_t i = 0; i < num_servos_; i++)
 		{
@@ -389,7 +409,7 @@ for(auto v: compensation)
 			int compensated =
 				raw +
 				servo_directions_[i] *
-				get_compensation_bits(i, positions[i]);
+				comp_bits[i];
 
 			compensated = std::clamp(
 				compensated,
@@ -439,8 +459,15 @@ for(auto v: compensation)
 		    publish(); 
 
 		    goal_reached = true;
+		    const bool use_model = compensation_enable_ && !simulation_ &&
+		                           compensation_mode_ == "gravity_model";
+		    const std::vector<double> q_now =
+		        use_model ? bits_to_radians(current_position_bits_) : std::vector<double>();
 		    for (size_t i = 0; i < num_servos_; i++) {
-		        if (std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits) {
+		        const bool off = use_model
+		            ? std::abs(q_now[i] - positions[i]) > goal_tolerance_rad_
+		            : std::abs(current_position_bits_[i] - goal_pose_bits_[i]) > tolerance_bits;
+		        if (off) {
 		            goal_reached = false;
 		            break;
 		        }
@@ -644,7 +671,7 @@ for(auto v: compensation)
         }
     }
 
-    std::vector<double> bits_to_radians(const std::vector<int>& bits)
+    std::vector<double> bits_to_radians_legacy(const std::vector<int>& bits)
 	{
 		std::vector<double> radians(bits.size());
 
@@ -669,7 +696,108 @@ for(auto v: compensation)
 		return radians;
 	}
 
-	int get_compensation_bits(size_t joint, double angle_rad)
+	// ======================================================
+    // COMPENSACIÓN DINÁMICA
+    // ======================================================
+    void load_deflection_model()
+    {
+        this->declare_parameter<std::string>("compensation_mode", "legacy");
+        this->declare_parameter<std::string>("payload_topic", "payload_mass");
+        this->declare_parameter<double>("goal_tolerance_rad", 0.05);
+        this->declare_parameter<std::vector<double>>("gc_joint_xyz",       std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_joint_axis",      std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_link_mass",       std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_link_com",        std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_payload_point",   std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_stiffness",       std::vector<double>());
+        this->declare_parameter<std::vector<double>>("gc_hidden_fraction", std::vector<double>());
+        this->declare_parameter<std::vector<int64_t>>("gc_max_deflection_bits", std::vector<int64_t>());
+
+        compensation_mode_  = this->get_parameter("compensation_mode").as_string();
+        payload_topic_      = this->get_parameter("payload_topic").as_string();
+        goal_tolerance_rad_ = this->get_parameter("goal_tolerance_rad").as_double();
+
+        if (compensation_mode_ != "gravity_model")
+        {
+            if (compensation_mode_ != "legacy")
+                RCLCPP_WARN(this->get_logger(), "compensation_mode '%s' desconocido, usando 'legacy'",
+                            compensation_mode_.c_str());
+            compensation_mode_ = "legacy";
+            return;
+        }
+
+        const size_t n = num_servos_;
+        const auto xyz  = this->get_parameter("gc_joint_xyz").as_double_array();
+        const auto axis = this->get_parameter("gc_joint_axis").as_double_array();
+        const auto mass = this->get_parameter("gc_link_mass").as_double_array();
+        const auto com  = this->get_parameter("gc_link_com").as_double_array();
+        const auto pp   = this->get_parameter("gc_payload_point").as_double_array();
+        const auto K    = this->get_parameter("gc_stiffness").as_double_array();
+        const auto hid  = this->get_parameter("gc_hidden_fraction").as_double_array();
+        const auto maxb = this->get_parameter("gc_max_deflection_bits").as_integer_array();
+
+        if (xyz.size() != 3 * n || axis.size() != 3 * n || com.size() != 3 * n ||
+            mass.size() != n || K.size() != n || hid.size() != n || maxb.size() != n ||
+            pp.size() != 3 || servo_bits_per_radian_.size() < n)
+        {
+            RCLCPP_ERROR(this->get_logger(),
+                "gravity_model: parámetros gc_* con tamaño incorrecto, usando compensación 'legacy'");
+            compensation_mode_ = "legacy";
+            return;
+        }
+
+        std::vector<arms::ArmDeflectionModel::Joint> joints(n);
+        for (size_t i = 0; i < n; i++)
+        {
+            joints[i].xyz       = {xyz[3 * i],  xyz[3 * i + 1],  xyz[3 * i + 2]};
+            joints[i].axis      = {axis[3 * i], axis[3 * i + 1], axis[3 * i + 2]};
+            joints[i].com       = {com[3 * i],  com[3 * i + 1],  com[3 * i + 2]};
+            joints[i].mass      = mass[i];
+            joints[i].stiffness = K[i];
+            joints[i].hidden    = hid[i];
+            joints[i].max_defl  = static_cast<double>(maxb[i]) / servo_bits_per_radian_[i];
+        }
+        deflection_model_.configure(std::move(joints), {pp[0], pp[1], pp[2]});
+
+        RCLCPP_INFO(this->get_logger(), "Compensación dinámica (gravity_model) activa, %zu articulaciones", n);
+    }
+
+    std::vector<int> compensation_bits(const std::vector<double>& q_des)
+    {
+        std::vector<int> bits(num_servos_, 0);
+        if (!compensation_enable_) return bits;
+
+        if (compensation_mode_ == "gravity_model")
+        {
+            const std::vector<double> cmd = deflection_model_.commandFromDesired(q_des);
+            for (size_t i = 0; i < num_servos_; i++)
+                bits[i] = static_cast<int>(std::lround((cmd[i] - q_des[i]) * servo_bits_per_radian_[i]));
+        }
+        else
+        {
+            for (size_t i = 0; i < num_servos_; i++)
+                bits[i] = get_compensation_bits(i, q_des[i]);
+        }
+        return bits;
+    }
+
+    std::vector<double> bits_to_radians(const std::vector<int>& bits)
+    {
+        if (compensation_mode_ != "gravity_model")
+            return bits_to_radians_legacy(bits);
+
+        std::vector<double> enc(bits.size());
+        for (size_t i = 0; i < bits.size(); i++)
+            enc[i] = static_cast<double>(servo_directions_[i] * (bits[i] - servo_zeros_[i])) /
+                     servo_bits_per_radian_[i];
+
+        if (!compensation_enable_ || simulation_)
+            return enc;
+
+        return deflection_model_.desiredFromEncoder(enc);
+    }
+
+    int get_compensation_bits(size_t joint, double angle_rad)
 	{
 		if(!compensation_enable_)
 		    return 0;
